@@ -161,8 +161,8 @@ class Trigger_log_generator:
         header_json = "Content-Type: application/json"
         if self.es_token:
             header_auth = "Authorization: Bearer " + self.es_token
-        s_time = datetime.datetime.utcfromtimestamp(start_time - 60).strftime("%Y-%m-%dT%H:%M:%S")
-        e_time = datetime.datetime.utcfromtimestamp(end_time + 60).strftime("%Y-%m-%dT%H:%M:%S")
+        s_time = datetime.datetime.utcfromtimestamp(start_time - 120).strftime("%Y-%m-%dT%H:%M:%S")
+        e_time = datetime.datetime.utcfromtimestamp(end_time + 120).strftime("%Y-%m-%dT%H:%M:%S")
         data = {
             "query": {
                 "bool": {
@@ -173,7 +173,7 @@ class Trigger_log_generator:
         }
 
         es_url = self.es_url + "/" + self.es_index + "/_count"
-
+        logger.debug(es_url)
         try:
             if self.es_token:
                 response = subprocess.check_output(
@@ -200,6 +200,7 @@ class Trigger_log_generator:
             return 0
         try:
             return json.loads(response)["count"]
+            logging.debug(json.loads(response)["count"])
         except Exception as err:
             logging.info("No valid json returned")
             logging.info(err)
@@ -283,10 +284,14 @@ class Trigger_log_generator:
                     messages_received = self._check_es(int(start_time), int(end_time))
                 elif self.kafka_bootstrap_server:
                     messages_received = self._check_kafka(start_time, end_time + self.timeout)
-                if messages_received >= message_count-10: # ES misses 1 or 2 messages inconsistently and very negligible, so tolerating 0.00001% loss.
+                # ES misses 1 or 2 messages inconsistently and very negligible, so tolerating 0.00001% loss.
+                if messages_received >= message_count - 10:
                     received_all_messages = True
                 else:
-                    logger.info("Message check failed. Received %d messages of %d. Retrying until timeout" % (messages_received, message_count))
+                    logger.info("Message check failed. Starting time: %s" % start_time)
+                    logger.info("Message check failed. Ending time: %s" % end_time)
+                    logger.info("Message check failed. Received %d messages of %d. Retrying until timeout" % (
+                        messages_received, message_count))
                     if self.kafka_bootstrap_server:
                         logger.info(
                             "Current messages received is {}, waiting more time for kafka".format(
